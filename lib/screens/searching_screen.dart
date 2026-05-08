@@ -65,23 +65,38 @@ class _SearchingScreenState extends State<SearchingScreen>
   }
 
   Future<void> _startMatching() async {
-    await MatchService.joinPool(widget.topic);
+    try {
+      print('>>> UID: ${MatchService.currentUid}');
+      await MatchService.joinPool(widget.topic);
+      print('>>> Pool\'a eklendi: ${widget.topic}');
+    } catch (e) {
+      print('>>> HATA: $e');
+      return;
+    }
 
     _matchSub = MatchService.listenForMatch().listen((snapshot) {
+      print('>>> Snapshot geldi: exists=${snapshot.exists}');
       if (!_searching) return;
       if (snapshot.exists) {
         final data = snapshot.data() as Map<String, dynamic>;
         final channelId = data['channelId'] as String;
         final topic = data['topic'] as String;
         final matchedUid = data['matchedUid'] as String;
+        print('>>> Eşleşme bulundu: $channelId');
         _onMatchFound(channelId, topic, matchedUid);
       }
+    }, onError: (e) {
+      print('>>> Listener HATA: $e');
     });
 
     _searchTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (!_searching) return;
       setState(() => _elapsedSeconds += 3);
-      await MatchService.findAndMatch(widget.topic);
+      try {
+        await MatchService.findAndMatch(widget.topic);
+      } catch (e) {
+        print('>>> findAndMatch HATA: $e');
+      }
     });
   }
 

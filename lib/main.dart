@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart'; // ← ekle
+import 'firebase_options.dart';                    // ← ekle
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-void main() {
+void main() async {                                // ← async ekle
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(                    // ← ekle
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  await FirebaseAuth.instance.signInAnonymously(); // ← ekle
+
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

@@ -6,6 +6,7 @@ class MatchService {
   static FirebaseAuth get _auth => FirebaseAuth.instance;
 
   static String get _uid => _auth.currentUser!.uid;
+  static String? get currentUid => _auth.currentUser?.uid;
 
   // Kullanıcıyı eşleşme havuzuna ekle
   static Future<void> joinPool(String topic) async {
