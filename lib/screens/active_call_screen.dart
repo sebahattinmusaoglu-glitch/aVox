@@ -1,13 +1,13 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/avox_header.dart';
 import '../widgets/waveform_painter.dart';
-import 'rating_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/match_service.dart';
 import '../services/agora_service.dart';
+import 'rating_screen.dart';
 
 class ActiveCallScreen extends StatefulWidget {
   final String topic;
@@ -32,53 +32,51 @@ class _ActiveCallScreenState extends State<ActiveCallScreen>
   late final AnimationController _waveCtrl;
   late Timer _timer;
   int _elapsed = 0;
-  StreamSubscription<DocumentSnapshot>? _sessionSub; 
+  StreamSubscription<DocumentSnapshot>? _sessionSub;
 
+  String get _shortUid => widget.matchedUid.substring(0, 4).toUpperCase();
 
-  String get _shortUid =>
-      widget.matchedUid.substring(0, 4).toUpperCase();
+  @override
+  void initState() {
+    super.initState();
+    _waveCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 750),
+    )..repeat();
 
-@override
-void initState() {
-  super.initState();
-  _waveCtrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 750),
-  )..repeat();
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        if (mounted) setState(() => _elapsed++);
+      },
+    );
 
-  _timer = Timer.periodic(
-    const Duration(seconds: 1),
-    (_) { if (mounted) setState(() => _elapsed++); },
-  );
+    _initSession();
+  }
 
-  // TODO: Agora.joinChannel(widget.channelId)
-  _initSession();
-} // ← initState burada kapanıyor
+  Future<void> _initSession() async {
+    await AgoraService.init();
+    await AgoraService.joinChannel(widget.channelId);
 
-Future<void> _initSession() async {
-  await AgoraService.init();   
-  await AgoraService.joinChannel(widget.channelId); 
+    await MatchService.startSession(widget.channelId);
 
-  await MatchService.startSession(widget.channelId);
+    _sessionSub = MatchService.listenSession(widget.channelId).listen((snap) {
+      if (!snap.exists) return;
+      final data = snap.data() as Map<String, dynamic>;
+      if (data['status'] == 'ended' && mounted) {
+        _navigateToRating();
+      }
+    });
+  }
 
-  _sessionSub = MatchService.listenSession(widget.channelId).listen((snap) {
-    if (!snap.exists) return;
-    final data = snap.data() as Map<String, dynamic>;
-    if (data['status'] == 'ended' && mounted) {
-      _navigateToRating();
-    }
-  });
-}
-
-@override
-void dispose() {
-  _waveCtrl.dispose();
-  _timer.cancel();
-  _sessionSub?.cancel(); // ← ekle
-  AgoraService.dispose();
-  // TODO: Agora.leaveChannel()
-  super.dispose();
-}
+  @override
+  void dispose() {
+    _waveCtrl.dispose();
+    _timer.cancel();
+    _sessionSub?.cancel();
+    AgoraService.dispose();
+    super.dispose();
+  }
 
   String get _formattedTime {
     final m = (_elapsed ~/ 60).toString().padLeft(2, '0');
@@ -86,24 +84,22 @@ void dispose() {
     return '$m:$s';
   }
 
-void _endCall() async {
-  await MatchService.endSession(widget.channelId);
-}
+  void _endCall() async {
+    await MatchService.endSession(widget.channelId);
+  }
 
-void _navigateToRating() {
-  _sessionSub?.cancel();
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => RatingScreen(
-        topic: widget.topic,
-        userId: _shortUid,
+  void _navigateToRating() {
+    _sessionSub?.cancel();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RatingScreen(
+          topic: widget.topic,
+          userId: _shortUid,
+        ),
       ),
-    ),
-  );
-}
-
-
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,21 +113,21 @@ void _navigateToRating() {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 28),
-                    _buildTopicSection(),
-                    const SizedBox(height: 36),
-                    _buildUserCard(),
-                    const SizedBox(height: 20),
-                    _buildAudioStatus(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 28),
+                      _buildTopicSection(),
+                      const SizedBox(height: 36),
+                      _buildUserCard(),
+                      const SizedBox(height: 20),
+                      _buildAudioStatus(),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
-            _buildCallControls(), // ← Expanded dışında, en altta
+            _buildCallControls(),
           ],
         ),
       ),
@@ -197,19 +193,19 @@ void _navigateToRating() {
     );
   }
 
-Widget _buildGeometricAvatar() {
-  return Container(
-    width: 110,
-    height: 110,
-    decoration: BoxDecoration(
-      color: AppColors.secondary.withOpacity(0.12),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: CustomPaint(
-      painter: _GeometricAvatarPainter(color: AppColors.secondary),
-    ),
-  );
-}
+  Widget _buildGeometricAvatar() {
+    return Container(
+      width: 110,
+      height: 110,
+      decoration: BoxDecoration(
+        color: AppColors.secondary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: CustomPaint(
+        painter: _GeometricAvatarPainter(color: AppColors.secondary),
+      ),
+    );
+  }
 
   Widget _buildAudioStatus() {
     return Row(
@@ -252,17 +248,19 @@ Widget _buildGeometricAvatar() {
             label: 'SESSİZ',
             onTap: () {
               setState(() => _isMuted = !_isMuted);
-              AgoraService.muteLocalAudio(_isMuted); // ← ekle
+              AgoraService.muteLocalAudio(_isMuted);
             },
             isActive: _isMuted,
           ),
           _buildEndBtn(),
           _buildControlBtn(
-            icon: _isSpeaker ? Icons.volume_up_rounded : Icons.volume_up_outlined,
+            icon: _isSpeaker
+                ? Icons.volume_up_rounded
+                : Icons.volume_up_outlined,
             label: 'HOPARLÖR',
             onTap: () {
               setState(() => _isSpeaker = !_isSpeaker);
-              AgoraService.setLoudspeaker(_isSpeaker); // ← ekle
+              AgoraService.setLoudspeaker(_isSpeaker);
             },
             isActive: _isSpeaker,
             activeColor: AppColors.secondary,
@@ -326,7 +324,7 @@ Widget _buildGeometricAvatar() {
             width: 64,
             height: 64,
             decoration: const BoxDecoration(
-              color: Color(0xFFE53935), // ← AppColors.danger yerine direkt renk
+              color: AppColors.danger,
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -336,10 +334,10 @@ Widget _buildGeometricAvatar() {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'BİTİR',
-            style: TextStyle(
-              color: Color(0xFFE53935),
+            style: GoogleFonts.inter(
+              color: AppColors.danger,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
@@ -349,6 +347,7 @@ Widget _buildGeometricAvatar() {
       ),
     );
   }
+}
 
 class _GeometricAvatarPainter extends CustomPainter {
   final Color color;
@@ -360,9 +359,9 @@ class _GeometricAvatarPainter extends CustomPainter {
     final cy = size.height / 2;
     for (int i = 0; i < 3; i++) {
       final r = size.width * (0.32 - i * 0.07);
-      final opacity = (0.55 - i * 0.12).clamp(0.0, 1.0); // ← ekle
+      final opacity = (0.55 - i * 0.12).clamp(0.0, 1.0);
       final paint = Paint()
-        ..color = color.withOpacity(opacity) // ← withValues yerine
+        ..color = color.withOpacity(opacity)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
       final path = Path()
