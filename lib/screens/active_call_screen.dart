@@ -5,6 +5,8 @@ import '../theme/app_theme.dart';
 import '../widgets/avox_header.dart';
 import '../widgets/waveform_painter.dart';
 import 'rating_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/match_service.dart';  
 
 class ActiveCallScreen extends StatefulWidget {
   final String topic;
@@ -29,33 +31,49 @@ class _ActiveCallScreenState extends State<ActiveCallScreen>
   late final AnimationController _waveCtrl;
   late Timer _timer;
   int _elapsed = 0;
+  StreamSubscription<DocumentSnapshot>? _sessionSub; 
+
 
   String get _shortUid =>
       widget.matchedUid.substring(0, 4).toUpperCase();
 
-  @override
-  void initState() {
-    super.initState();
-    _waveCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 750),
-    )..repeat();
+@override
+void initState() {
+  super.initState();
+  _waveCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 750),
+  )..repeat();
 
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) { if (mounted) setState(() => _elapsed++); },
-    );
+  _timer = Timer.periodic(
+    const Duration(seconds: 1),
+    (_) { if (mounted) setState(() => _elapsed++); },
+  );
 
-    // TODO: Agora.joinChannel(widget.channelId)
-  }
+  // TODO: Agora.joinChannel(widget.channelId)
+  _initSession();
+} // ← initState burada kapanıyor
 
-  @override
-  void dispose() {
-    _waveCtrl.dispose();
-    _timer.cancel();
-    // TODO: Agora.leaveChannel()
-    super.dispose();
-  }
+Future<void> _initSession() async {
+  await MatchService.startSession(widget.channelId);
+
+  _sessionSub = MatchService.listenSession(widget.channelId).listen((snap) {
+    if (!snap.exists) return;
+    final data = snap.data() as Map<String, dynamic>;
+    if (data['status'] == 'ended' && mounted) {
+      _navigateToRating();
+    }
+  });
+}
+
+@override
+void dispose() {
+  _waveCtrl.dispose();
+  _timer.cancel();
+  _sessionSub?.cancel(); // ← ekle
+  // TODO: Agora.leaveChannel()
+  super.dispose();
+}
 
   String get _formattedTime {
     final m = (_elapsed ~/ 60).toString().padLeft(2, '0');
@@ -63,17 +81,24 @@ class _ActiveCallScreenState extends State<ActiveCallScreen>
     return '$m:$s';
   }
 
-  void _endCall() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RatingScreen(
-          topic: widget.topic,
-          userId: _shortUid,
-        ),
+void _endCall() async {
+  await MatchService.endSession(widget.channelId);
+}
+
+void _navigateToRating() {
+  _sessionSub?.cancel();
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => RatingScreen(
+        topic: widget.topic,
+        userId: _shortUid,
       ),
-    );
-  }
+    ),
+  );
+}
+
+
 
   @override
   Widget build(BuildContext context) {

@@ -47,10 +47,11 @@ class MatchService {
       (d) => (d['topic'] as String).toLowerCase() == topic.toLowerCase(),
     );
 
-    final match = sameTopic.isNotEmpty
-        ? sameTopic.first
-        : snapshot.docs.first;
+    if (sameTopic.isEmpty) return null; // ← farklı konuysa eşleşme yapma
 
+    // final match = sameTopic.isNotEmpty ? sameTopic.first : snapshot.docs.first; // Aynı konu yoksa Yoksa ilk gelenle eşleş
+    
+    final match = sameTopic.first; // Sadece aynı konudan eşleşme yap
     final matchedUid = match['uid'] as String;
     final channelId = _generateChannelId(_uid, matchedUid);
 
@@ -82,4 +83,27 @@ class MatchService {
     final sorted = [uid1, uid2]..sort();
     return '${sorted[0].substring(0, 8)}_${sorted[1].substring(0, 8)}';
   }
+
+  // Görüşmeyi başlat
+  static Future<void> startSession(String channelId) async {
+    await _db.collection('sessions').doc(channelId).set({
+      'channelId': channelId,
+      'startedAt': FieldValue.serverTimestamp(),
+      'status': 'active',
+    });
+  }
+
+  // Görüşmeyi sonlandır
+  static Future<void> endSession(String channelId) async {
+    await _db.collection('sessions').doc(channelId).update({
+      'status': 'ended',
+      'endedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Görüşme durumunu dinle
+  static Stream<DocumentSnapshot> listenSession(String channelId) {
+    return _db.collection('sessions').doc(channelId).snapshots();
+  }
+
 }

@@ -41,5 +41,5 @@ class WaveformPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(WaveformPainter old) => true;
+  bool shouldRepaint(WaveformPainter old) => true; 
 }
