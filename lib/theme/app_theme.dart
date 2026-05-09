@@ -5,7 +5,7 @@ class AppColors {
   static const Color background     = Color(0xFF0B0B18);
   static const Color surface        = Color(0xFF13132A);
   static const Color card           = Color(0xFF1A1A2E);
-  static const Color primary        = Color(0xFF7B61FF);
+  static const Color primary        = Color(0xFFBDC2FF);
   static const Color secondary      = Color(0xFF4DD9C5);
   static const Color success        = Color(0xFF4CAF82);
   static const Color warning        = Color(0xFFFFB74D);

@@ -24,21 +24,57 @@ class _RatingScreenState extends State<RatingScreen> {
   int _relevance = 0;       // 0–5
   final TextEditingController _feedbackCtrl = TextEditingController();
 
+  bool get _hasInteraction =>
+      _politeness != null ||
+      _topicKnowledge > 0 ||
+      _relevance > 0 ||
+      _feedbackCtrl.text.trim().isNotEmpty;
+
+  int get _earnedPoints {
+  int points = 0;
+  if (_politeness != null) points += 2;
+  if (_topicKnowledge > 0) points += 2;
+  if (_relevance > 0) points += 2;
+  if (_feedbackCtrl.text.trim().isNotEmpty) points += 4;
+  return points;
+  }
+
   @override
   void dispose() {
     _feedbackCtrl.dispose();
     super.dispose();
   }
 
-  void _submit() {
-    // TODO: Write rating to Firestore
-    // FirebaseFirestore.instance.collection('sessions').add({...})
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-      (_) => false,
+  @override
+  void initState() {
+    super.initState();
+    _feedbackCtrl.addListener(() => setState(() {}));
+  }
+
+void _submit() {
+  if (_hasInteraction) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Geri bildiriminiz için teşekkürler 🙏',
+          style: GoogleFonts.inter(color: Colors.white),
+        ),
+        backgroundColor: AppColors.card,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
     );
   }
+
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (_) => const HomeScreen()),
+    (_) => false,
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -115,14 +151,14 @@ class _RatingScreenState extends State<RatingScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          'Deneyiminizi puanlayarak topluluğumuzu\ngeliştirmemize yardımcı ol.',
-          style: GoogleFonts.inter(
-            color: AppColors.textSecondary,
-            fontSize: 14,
-            height: 1.55,
+          Text(
+          'Aşağıdaki alanları doldurmaya başla,', style: GoogleFonts.inter( color: AppColors.textPrimary, fontSize: 16,),
           ),
-        ),
+
+          Text(
+          '${_earnedPoints > 0 ? '+$_earnedPoints ' : ''}itibar puanı kazan!',
+            style: GoogleFonts.inter( color: AppColors.secondary, fontSize: 16, height: 1.55,),
+              ),
       ],
     );
   }
@@ -370,7 +406,7 @@ class _RatingScreenState extends State<RatingScreen> {
           elevation: 0,
         ),
         child: Text(
-          'Ana Sayfaya Dön',
+          _hasInteraction ? 'Gönder ve Ana Sayfaya Dön' : 'Ana Sayfaya Dön',
           style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w600,
