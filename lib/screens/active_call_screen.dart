@@ -6,7 +6,8 @@ import '../widgets/avox_header.dart';
 import '../widgets/waveform_painter.dart';
 import 'rating_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/match_service.dart';  
+import '../services/match_service.dart';
+import '../services/agora_service.dart';
 
 class ActiveCallScreen extends StatefulWidget {
   final String topic;
@@ -55,6 +56,9 @@ void initState() {
 } // ← initState burada kapanıyor
 
 Future<void> _initSession() async {
+  await AgoraService.init();   
+  await AgoraService.joinChannel(widget.channelId); 
+
   await MatchService.startSession(widget.channelId);
 
   _sessionSub = MatchService.listenSession(widget.channelId).listen((snap) {
@@ -71,6 +75,7 @@ void dispose() {
   _waveCtrl.dispose();
   _timer.cancel();
   _sessionSub?.cancel(); // ← ekle
+  AgoraService.dispose();
   // TODO: Agora.leaveChannel()
   super.dispose();
 }
@@ -111,6 +116,7 @@ void _navigateToRating() {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SingleChildScrollView(
                 child: Column(
                   children: [
                     const SizedBox(height: 28),
@@ -119,12 +125,13 @@ void _navigateToRating() {
                     _buildUserCard(),
                     const SizedBox(height: 20),
                     _buildAudioStatus(),
-                    const Spacer(),
+                    const SizedBox(height: 20),
                   ],
+                ),
                 ),
               ),
             ),
-            _buildCallControls(),
+            _buildCallControls(), // ← Expanded dışında, en altta
           ],
         ),
       ),
@@ -190,19 +197,19 @@ void _navigateToRating() {
     );
   }
 
-  Widget _buildGeometricAvatar() {
-    return Container(
-      width: 110,
-      height: 110,
-      decoration: BoxDecoration(
-        color: AppColors.secondary.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: CustomPaint(
-        painter: _GeometricAvatarPainter(color: AppColors.secondary),
-      ),
-    );
-  }
+Widget _buildGeometricAvatar() {
+  return Container(
+    width: 110,
+    height: 110,
+    decoration: BoxDecoration(
+      color: AppColors.secondary.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: CustomPaint(
+      painter: _GeometricAvatarPainter(color: AppColors.secondary),
+    ),
+  );
+}
 
   Widget _buildAudioStatus() {
     return Row(
@@ -238,18 +245,25 @@ void _navigateToRating() {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _buildControlBtn(
             icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_off_outlined,
             label: 'SESSİZ',
-            onTap: () => setState(() => _isMuted = !_isMuted),
+            onTap: () {
+              setState(() => _isMuted = !_isMuted);
+              AgoraService.muteLocalAudio(_isMuted); // ← ekle
+            },
             isActive: _isMuted,
           ),
           _buildEndBtn(),
           _buildControlBtn(
             icon: _isSpeaker ? Icons.volume_up_rounded : Icons.volume_up_outlined,
             label: 'HOPARLÖR',
-            onTap: () => setState(() => _isSpeaker = !_isSpeaker),
+            onTap: () {
+              setState(() => _isSpeaker = !_isSpeaker);
+              AgoraService.setLoudspeaker(_isSpeaker); // ← ekle
+            },
             isActive: _isSpeaker,
             activeColor: AppColors.secondary,
           ),
@@ -312,17 +326,20 @@ void _navigateToRating() {
             width: 64,
             height: 64,
             decoration: const BoxDecoration(
-              color: AppColors.danger,
+              color: Color(0xFFE53935), // ← AppColors.danger yerine direkt renk
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.call_end_rounded,
-                color: Colors.white, size: 26),
+            child: const Icon(
+              Icons.call_end_rounded,
+              color: Colors.white,
+              size: 26,
+            ),
           ),
           const SizedBox(height: 6),
-          Text(
+          const Text(
             'BİTİR',
-            style: GoogleFonts.inter(
-              color: AppColors.danger,
+            style: TextStyle(
+              color: Color(0xFFE53935),
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
@@ -332,7 +349,6 @@ void _navigateToRating() {
       ),
     );
   }
-}
 
 class _GeometricAvatarPainter extends CustomPainter {
   final Color color;
@@ -344,8 +360,9 @@ class _GeometricAvatarPainter extends CustomPainter {
     final cy = size.height / 2;
     for (int i = 0; i < 3; i++) {
       final r = size.width * (0.32 - i * 0.07);
+      final opacity = (0.55 - i * 0.12).clamp(0.0, 1.0); // ← ekle
       final paint = Paint()
-        ..color = color.withOpacity(0.55 - i * 0.12)
+        ..color = color.withOpacity(opacity) // ← withValues yerine
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
       final path = Path()
