@@ -70,6 +70,7 @@ Future<void> _submit() async {
         topicKnowledge: _topicKnowledge,
         relevance: _relevance,
         feedback: _feedbackCtrl.text.trim(),
+        earnedPoints: _earnedPoints,
       );
     } catch (e) {
       debugPrint('Rating submit error: $e');

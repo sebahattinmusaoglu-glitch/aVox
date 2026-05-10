@@ -10,6 +10,9 @@ class MatchService {
 
   // Kullanıcıyı eşleşme havuzuna ekle
   static Future<void> joinPool(String topic) async {
+    // Eski stale match kaydını temizle (bir önceki görüşmeden kalmış olabilir)
+    await _db.collection('matches').doc(_uid).delete();
+
     await _db.collection('pool').doc(_uid).set({
       'uid': _uid,
       'topic': topic,
@@ -88,6 +91,7 @@ class MatchService {
   static Future<void> startSession(String channelId) async {
     await _db.collection('sessions').doc(channelId).set({
       'channelId': channelId,
+      'participants': [_uid], // ← yapılacak temizlik için
       'startedAt': FieldValue.serverTimestamp(),
       'status': 'active',
     });
