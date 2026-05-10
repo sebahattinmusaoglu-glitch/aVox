@@ -3,15 +3,20 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/avox_header.dart';
 import 'home_screen.dart';
+import '../services/rating_service.dart';
 
 class RatingScreen extends StatefulWidget {
   final String topic;
-  final String userId;
+  final String userId;     // kısa uid (UI için)
+  final String channelId;  // ← YENİ
+  final String matchedUid; // ← YENİ (tam uid, Firestore için)
 
   const RatingScreen({
     super.key,
     required this.topic,
     required this.userId,
+    required this.channelId,  // ← YENİ
+    required this.matchedUid, // ← YENİ
   });
 
   @override
@@ -23,6 +28,7 @@ class _RatingScreenState extends State<RatingScreen> {
   int _topicKnowledge = 0;  // 0–5
   int _relevance = 0;       // 0–5
   final TextEditingController _feedbackCtrl = TextEditingController();
+  bool _isLoading = false;
 
   bool get _hasInteraction =>
       _politeness != null ||
@@ -51,29 +57,50 @@ class _RatingScreenState extends State<RatingScreen> {
     _feedbackCtrl.addListener(() => setState(() {}));
   }
 
-void _submit() {
+Future<void> _submit() async {
+  if (_isLoading) return;
+
   if (_hasInteraction) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Geri bildiriminiz için teşekkürler 🙏',
-          style: GoogleFonts.inter(color: Colors.white),
+    setState(() => _isLoading = true);
+    try {
+      await RatingService().submitRating(
+        channelId: widget.channelId,
+        toUid: widget.matchedUid,
+        politeness: _politeness == null ? 0 : (_politeness! ? 5 : 1),
+        topicKnowledge: _topicKnowledge,
+        relevance: _relevance,
+        feedback: _feedbackCtrl.text.trim(),
+      );
+    } catch (e) {
+      debugPrint('Rating submit error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Geri bildiriminiz için teşekkürler 🙏',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: AppColors.card,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
         ),
-        backgroundColor: AppColors.card,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
+      );
+    }
   }
 
-  Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (_) => const HomeScreen()),
-    (_) => false,
-  );
+  if (mounted) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (_) => false,
+    );
+  }
 }
 
   @override
@@ -349,6 +376,8 @@ void _submit() {
           child: TextField(
             controller: _feedbackCtrl,
             maxLines: 4,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
             style: GoogleFonts.inter(
                 color: AppColors.textPrimary, fontSize: 14),
             decoration: InputDecoration(
@@ -398,21 +427,33 @@ void _submit() {
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _submit,
+        onPressed: _isLoading ? null : _submit,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.secondary,
+          disabledBackgroundColor: AppColors.secondary.withOpacity(0.5),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
-        child: Text(
-          _hasInteraction ? 'Gönder ve Ana Sayfaya Dön' : 'Ana Sayfaya Dön',
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.background,
-          ),
-        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : Text(
+                _hasInteraction
+                    ? 'Gönder ve Ana Sayfaya Dön'
+                    : 'Ana Sayfaya Dön',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.background,
+                ),
+              ),
       ),
     );
   }

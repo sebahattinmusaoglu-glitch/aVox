@@ -96,6 +96,8 @@ class _ActiveCallScreenState extends State<ActiveCallScreen>
         builder: (_) => RatingScreen(
           topic: widget.topic,
           userId: _shortUid,
+          channelId: widget.channelId,
+          matchedUid: widget.matchedUid,
         ),
       ),
     );
